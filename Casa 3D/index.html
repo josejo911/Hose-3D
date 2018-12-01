@@ -1,0 +1,411 @@
+<html>
+	<head>
+		<title>Proyecto CASA 3D -- JOSE JO </title>
+
+		<style>
+			body {
+				margin: 0px;
+				background-color: #000000;
+				color: #fff;
+				font-family:Monospace;
+				font-size: 15px;
+				line-height: 30px;
+				overflow: hidden;
+			}
+			#info {
+				text-align: center;
+				position: absolute;
+				top: 0px; width: 100%;
+				padding: 15px;
+				z-index:100;
+			}
+
+			canvas{
+				width: 100%;
+				height: 100%;
+			}
+		</style>
+
+	</head>
+
+	<body>
+
+		<div id="info">
+		Para casa "W" arriba | "S" Abajo | "A" Izquierda | "D" Derecha | "Z" Aumentar Tamanio "X" Reducir Tamanio <br />
+		Para Arbol "O" arriba | "L" Abajo | "K" Izquierda | ";" Derecha | "N" Aumentar Tamanio "M" Reducir Tamanio<br />
+		SHEAR CASA "1" + | "2" - ||||||||||||||||||| SHEAR ARBOL  "3" + |  "4" - ||||<br />
+		Para Rotar Casa "E" Eje X | "R" Eje Y | "T" Eje Z | <br />
+		Para Rotar Arbol "Y" Eje X | "U" Eje Y | "I" Eje Z | <br />
+		Wireframe Casa "7 y 8"<br />
+		WireFrame Arbol "9 y 0"<br />
+
+
+
+		Abrir Puerta "Q" |  Cerrar puerta " ` "  
+		Presione "Q" para cambiar a mundo/espacio local
+</div>
+
+
+
+		<script src="js/ObjectLoader.js"></script>
+		<script src="js/three.js"></script>
+		<script src="js/OrbitControls.js"></script>
+		<script src="js/TransformControls.js"></script>
+		<script src="js/CanvasRenderer.js"></script>
+		<script src="js/Projector.js"></script>
+		<script src="js/stats.min.js"></script>
+		<script src="js/tween.min.js"></script>
+
+
+
+
+
+		<script>
+			
+			var scene = new THREE.Scene();
+			var control;
+			var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+			var mouse = new THREE.Vector2(), mouseClick = new THREE.Vector2(),INTERSECTED, raycaster;
+			var casa, arbol, terreno;
+			var sonidoabierto = new Audio("models/puerta_7.mp3");
+			var sonidocerrrado = new Audio("models/001216934_prev.mp3");
+
+
+					    //shear matrix y matrix normal
+		    var Syx = 1,
+		        Szx = 0,
+		        Sxy = 0,
+		        Szy = 0,
+		        Sxz = 0,
+		        Syz = 0;
+		    var shear = new THREE.Matrix4();
+		    shear.set(1, Syx, Szx, 0,
+		        Sxy, 1, Szy, 0,
+		        Sxz, Syz, 1, 0,
+		        0, 0, 0, 1);
+
+		        var normal = new THREE.Matrix4();
+			    normal.set(1, -Syx, Szx, 0,
+			        Sxy, 1, Szy, 0,
+			        Sxz, Syz, 1, 0,
+			        0, 0, 0, 1);
+
+
+			var renderer = new THREE.WebGLRenderer();
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			document.body.appendChild(renderer.domElement);
+
+			window.addEventListener('resize', function()
+			{
+				var width = window.innerWidth;
+				var height = window.innerHeight;
+				renderer.setSize(width,height);
+				camera.aspect = width/height;
+				camera.updateProjectionMatrix();
+			});
+			control = new THREE.TransformControls( camera, renderer.domElement );
+			control.addEventListener( 'change', render );
+
+
+
+			window.addEventListener("mousemove", onDocumentMouseMove, false);
+  			window.addEventListener("click", onDocumentClick, false);
+
+			controls = new THREE.OrbitControls(camera,renderer.domElement);
+
+			//cargando el modelo
+
+			var loader = new THREE.ObjectLoader();
+
+			loader.load(
+				// resource URL
+				"models/models2/open-world-scene.json",function ( obj ) {
+					casa = obj.getObjectByName("casita");
+					arbol = obj.getObjectByName("Merged_Meshes");
+					puerta = obj.getObjectByName("DoorFront")
+
+					
+					//var casa = obj.getObjectByName("")
+					// Add the loaded object to the scene
+
+					//obj.children.map(child => child.material.wireframe = true);
+					obj.children.map(child =>console.log(child));
+
+
+					scene.add( obj );
+					return true;
+
+				},
+
+				// onProgress callback
+				function ( xhr ) {
+					console.log( (xhr.loaded / xhr.total * 100) + '% loaded' );
+				},
+
+				// onError callback
+				function ( err ) {
+					console.error( 'An error happened' );
+				}
+			);
+
+			var skyGeo = new THREE.SphereGeometry(100000, 25, 25); 
+
+			document.addEventListener("keydown", onDocumentKeyDown, false);
+			function onDocumentKeyDown(event){
+
+				var keyCode = event.which;
+
+				switch (event.key){
+
+					//movimiento de casa 
+					case 'w':
+						casa.position.y = casa.position.y - 5;
+						break;
+
+
+
+					case 's':
+						casa.position.y = casa.position.y + 5;
+						break;
+
+
+					case 'a':
+						casa.position.x = casa.position.x + 5;
+						break;
+
+					case 'd':
+						casa.position.x = casa.position.x - 5;
+						break;
+
+					//escalar la casa en x y z
+
+					case 'z':
+						casa.scale.x = casa.scale.x *1.1;
+						casa.scale.y = casa.scale.y *1.1;
+						casa.scale.z = casa.scale.z *1.1;
+						break;
+
+
+					case 'x':
+						casa.scale.x = casa.scale.x *0.9;
+						casa.scale.y = casa.scale.y *0.9;
+						casa.scale.z = casa.scale.z *0.9;
+						break;
+					
+
+					//Rotaciones de casa
+
+					case 'e':
+						casa.rotateX(1);
+						break;
+
+					case 'r':
+						casa.rotateY(1);
+						break;
+
+					case 't':
+						casa.rotateZ(1);
+						break;
+
+
+		//movimiento de arbol
+					case 'o':
+						arbol.position.y = arbol.position.y - 5;
+						break;
+
+
+
+					case 'l':
+						arbol.position.y = arbol.position.y + 5;
+						break;
+
+
+					case 'k':
+						arbol.position.x = arbol.position.x + 5;
+						break;
+
+					case ';':
+						arbol.position.x = arbol.position.x - 5;
+						break;
+
+					//escalar la arbol en x y z
+
+					case 'n':
+						arbol.scale.x = arbol.scale.x *1.1;
+						arbol.scale.y = arbol.scale.y *1.1;
+						arbol.scale.z = arbol.scale.z *1.1;
+						break;
+
+
+					case 'm':
+						arbol.scale.x = arbol.scale.x *0.9;
+						arbol.scale.y = arbol.scale.y *0.9;
+						arbol.scale.z = arbol.scale.z *0.9;
+						break;
+					
+
+					//Rotaciones de casa
+
+					case 'y':
+						arbol.rotateX(1);
+						break;
+
+					case 'u':
+						arbol.rotateY(1);
+						break;
+
+					case 'i':
+						arbol.rotateZ(1);
+						break;
+					///shear casa
+
+					case '1':
+		                casa.applyMatrix(shear);
+		                break;
+
+
+					case '2':
+						casa.applyMatrix(normal);
+						break;
+
+					//shear arbol
+
+
+					case '3':
+		                arbol.applyMatrix(shear);
+		                break;
+
+					case '4':
+						arbol.applyMatrix(normal);
+						break;
+
+					//rotar puerta
+
+					case 'q':
+						puerta.rotateY(-1);
+						puerta.position.x = puerta.position.x - 0.6;
+						puerta.position.y = puerta.position.y - 0.8;
+						sonidoabierto.play();
+						break;
+
+					case '`':
+						puerta.rotateY(+1);
+						puerta.position.x = puerta.position.x + 0.6;
+						puerta.position.y = puerta.position.y + 0.8;	
+						sonidocerrrado.play();				
+						break;
+
+					// wireframe casa
+
+
+
+					case '7':
+						casa.children.map((function(child){
+							child.material.wireframe= true;
+						}))
+						break;
+
+					case '8':
+						casa.children.map((function(child){
+							child.material.wireframe= false;
+						}))
+						break;
+
+				// wireframe arbol
+
+					case '9':
+						console.log(arbol);
+						arbol.children.map((function(child){
+							material.wireframe= true;
+						}))
+						break;
+
+					case '0	':
+						arbol.children.map((function(child){
+							material.wireframe= false;
+						}))
+						break;
+
+
+
+
+
+				}
+			}
+
+			
+			// escala para los objetos
+			function onDocumentMouseMove(event) {
+			  mouse.x = event.clientX / window.innerWidth * 2 - 1;
+			  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+			}
+
+			function onDocumentClick(event) {
+			  // event.preventDefault();
+			  mouseClick.x = event.clientX / window.innerWidth * 2 - 1;
+			  mouseClick.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+			  // figure out which objects in the scene were clicked
+			  raycaster.setFromCamera(mouseClick, camera);
+			  var intersects = raycaster.intersectObjects(scene.children);
+			  var degToRad = Math.PI / 180;
+
+			  // make clicked things open/close with a tweened animation
+			  intersects.forEach(clickedObject => {
+			    // is door open or closed already?
+			    var targetAngle = clickedObject.object.rotation.y === -100 * degToRad
+			      ? 0
+			      : -100 * degToRad;
+
+			    new TWEEN.Tween(clickedObject.object.rotation)
+			      .easing(TWEEN.Easing.Circular.Out)
+			      .to(
+			        {
+			          y: targetAngle
+			        },
+			        500
+			      )
+			      .start();
+			  });
+			}
+
+
+			camera.position.z = 3;
+
+			//para la luz
+
+				var light = new THREE.DirectionalLight( 0xaabbff, 0.8 );
+				light.position.x = 300;
+				light.position.y = 250;
+				light.position.z = -500;
+				scene.add( light );
+
+	//game logic
+	//Se aplican las transformaciones a las cosas
+			var update = function(){
+
+				//cube.rotation.x += 0.01;
+				//cube.rotation.y += 0.005;
+
+			};
+
+			//draw scene
+
+			var render = function(){
+				renderer.render(scene,camera);
+			};
+
+	// game loop update, render, repeat
+			var GameLoop = function(){
+				requestAnimationFrame(GameLoop);
+
+				update();
+				render();
+
+			};
+
+			GameLoop();
+		</script>
+
+	</body>
+</html>
